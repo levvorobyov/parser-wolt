@@ -19,15 +19,14 @@ except ImportError:
 # --- КОНФИГУРАЦИЯ ---
 LOCK_FILE = "run_all.lock"
 LOG_FILE = "run_interactive.log"
-# --- НОВЫЕ ПЕРЕКЛЮЧАТЕЛИ ---
+# --- ПЕРЕКЛЮЧАТЕЛИ ---
 USE_VPN = True    # Измените на False, чтобы отключить VPN
-USE_PROXY = True  # Измените на False, чтобы отключить Прокси
+USE_PROXY = False  # Измените на True, чтобы включить Прокси
 
 # --- СПИСОК ССЫЛОК ДЛЯ ПАРСИНГА ---
-# -- Cкопируйте и вставьте этот словарь в ваш файл run_all.py --
-
 LINKS_TO_PARSE = {
-    '1': ("test", "https://wolt.com/az/aze/baku/venue/araz-yasamal-3-superstore-f/items/saqqz-95"),
+    '1': ("Saqqız (Жвачка)", "https://wolt.com/az/aze/baku/venue/araz-yasamal-3-superstore-f/items/saqqz-95"),
+    '2': ("Meyve", "https://wolt.com/az/aze/baku/venue/araz-yasamal-3-superstore-f/items/meyv-18"),
 }
 
 def setup_logging():
@@ -79,7 +78,6 @@ def create_lock_file():
 
 def remove_lock_file():
     """Удаляет lock-файл, если он существует."""
-    # Используем print, т.к. логгер к моменту выхода может быть уже закрыт
     print("Lock-файл удален. Работа завершена.")
     if os.path.exists(LOCK_FILE):
         os.remove(LOCK_FILE)
@@ -88,9 +86,11 @@ def display_menu(menu_title, options):
     """Отображает универсальное меню."""
     print("\n" + "="*60)
     print(menu_title)
+    # ДОБАВЛЕНО: Опция "Парсить всё"
+    print("  0: Парсить все категории (Parse All Categories)")
     for key, text in options.items():
         print(f"  {key}: {text}")
-    print("\nВведите номера через запятую (например: 1 или 1,3) или 'exit' для выхода.")
+    print("\nВведите номер (например: 1), номера через запятую (1,3), 0 для всех, или 'exit' для выхода.")
     print("="*60)
 
 def get_link_selection():
@@ -99,9 +99,16 @@ def get_link_selection():
         user_input = input("> ").strip()
         if user_input.lower() == 'exit':
             return []
+        
+        # ДОБАВЛЕНО: Проверка на ввод "0"
+        if user_input == '0':
+            print("Выбраны все категории для парсинга.")
+            return list(LINKS_TO_PARSE.values())
+
         if not user_input:
             print("Ошибка: Пустой ввод. Пожалуйста, введите номер.")
             continue
+            
         choices = [c.strip() for c in user_input.split(',')]
         selected_links = []
         valid_selection = True
@@ -109,7 +116,7 @@ def get_link_selection():
             if choice in LINKS_TO_PARSE:
                 selected_links.append(LINKS_TO_PARSE[choice])
             else:
-                print(f"Ошибка: Неверный выбор '{choice}'. Доступные варианты: {', '.join(LINKS_TO_PARSE.keys())}")
+                print(f"Ошибка: Неверный выбор '{choice}'. Доступные варианты: {', '.join(LINKS_TO_PARSE.keys())} или 0.")
                 valid_selection = False
                 break
         if valid_selection:
@@ -130,7 +137,7 @@ def run_script(script_name, url=None, use_proxy_flag=False):
     
     logging.info(f"\n{'='*25} ЗАПУСК СКРИПТА: {script_name} {'='*25}\n")
     try:
-        with subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, encoding='utf-8') as p:
+        with subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, encoding='utf-8', bufsize=1) as p:
             for line in p.stdout:
                 logging.info(line.strip())
         
@@ -149,7 +156,6 @@ def run_script(script_name, url=None, use_proxy_flag=False):
 def main():
     """Основная функция: меню и последовательный запуск парсера и сендера."""
     
-    # --- ИНТЕРАКТИВНЫЙ ВЫБОР КАТЕГОРИЙ ---
     display_menu("Выберите категории для парсинга:", {k: v[0] for k, v in LINKS_TO_PARSE.items()})
     selected_links = get_link_selection()
     
@@ -157,7 +163,6 @@ def main():
         print("Выход из программы.")
         return
 
-    # --- НАЧАЛО ЛОГИРОВАНИЯ ---
     setup_logging()
     
     sudo_password = '31337' 
