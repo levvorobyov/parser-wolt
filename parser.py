@@ -27,7 +27,7 @@ print(f"Информация: Используется ссылка для па�
 
 PHOTO_DIR = 'photos'
 CSV_PATH = 'bazarstore_products.csv'
-LIMIT = 1700
+LIMIT = 100000
 MAX_RETRIES = 1
 USE_PROXY_FLAG = '--use-proxy' in sys.argv
 

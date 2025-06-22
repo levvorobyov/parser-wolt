@@ -13,7 +13,7 @@ SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 CSV_FILE = os.path.join(SCRIPT_DIR, 'bazarstore_products.csv')
 PHOTOS_DIR = os.path.join(SCRIPT_DIR, 'photos')
 FLASK_MARKET_API_URL = 'http://192.168.255.11:5500/api/competitor-parser/load-competitor-product'
-SHEBEKE_ID_UMICO = 198065839
+SHEBEKE_ID_UMICO = 198006659
 API_KEY = '3e8d9b42c12a4e849b473fdc68c0cba70fe35338e4b01e6ed1fc2d3225cf07aa'
 
 TEST_MODE_ROW_LIMIT = 1000000
