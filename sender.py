@@ -13,7 +13,8 @@ SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 CSV_FILE = os.path.join(SCRIPT_DIR, 'bazarstore_products.csv')
 PHOTOS_DIR = os.path.join(SCRIPT_DIR, 'photos')
 FLASK_MARKET_API_URL = 'http://192.168.255.11:5500/api/competitor-parser/load-competitor-product'
-SHEBEKE_ID_UMICO = 198006659
+# !!! ИЗМЕНЕНИЕ: ID удален отсюда, теперь он передается как аргумент при запуске
+# SHEBEKE_ID_UMICO = 198006659
 API_KEY = '3e8d9b42c12a4e849b473fdc68c0cba70fe35338e4b01e6ed1fc2d3225cf07aa'
 
 TEST_MODE_ROW_LIMIT = 1000000
@@ -88,6 +89,17 @@ def main():
         print("Ошибка: API_KEY не установлен или используется ключ-плейсхолдер в sender.py. Пожалуйста, установите его.")
         return
 
+    # !!! ИЗМЕНЕНИЕ: Получаем ID из аргументов командной строки
+    try:
+        if len(sys.argv) < 2:
+            print("Ошибка: Необходим ID Shebeke в качестве аргумента командной строки.")
+            print("Пример: python sender.py 198006659")
+            return
+        shebeke_id_to_use = int(sys.argv[1])
+    except (ValueError, IndexError):
+        print(f"Ошибка: ID Shebeke должен быть числом, получено: '{sys.argv[1:]}'")
+        return
+
     try:
         df = pd.read_csv(CSV_FILE)
         print(f"Инфо: CSV прочитан ({len(df)}). Колонки: {df.columns.tolist()}")
@@ -106,12 +118,14 @@ def main():
     else:
         df_to_send = df
 
-    print(f"Инфо: Начинаем отправку {len(df_to_send)} товаров (Shebeke ID: {SHEBEKE_ID_UMICO})...")
+    # !!! ИЗМЕНЕНИЕ: Используем переменную shebeke_id_to_use, полученную из аргументов
+    print(f"Инфо: Начинаем отправку {len(df_to_send)} товаров (Shebeke ID: {shebeke_id_to_use})...")
     success_count = 0
     fail_count = 0
 
     for index, row in df_to_send.iterrows():
-        if send_product_data(row, SHEBEKE_ID_UMICO):
+        # !!! ИЗМЕНЕНИЕ: Передаем ID в функцию отправки
+        if send_product_data(row, shebeke_id_to_use):
             success_count += 1
         else:
             fail_count += 1
