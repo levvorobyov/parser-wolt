@@ -6,15 +6,16 @@ import os
 import time
 import sys
 import re
+import io
+from PIL import Image
 
 # --- НАСТРОЙКИ ---
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
-# !!! ИЗМЕНЕНО: Пути к CSV-файлу и папке с фото
+# Пути к CSV-файлу и папке с фото
 CSV_FILE = os.path.join(SCRIPT_DIR, 'bazarstore_products.csv')
 PHOTOS_DIR = os.path.join(SCRIPT_DIR, 'photos')
 FLASK_MARKET_API_URL = 'http://192.168.255.11:5500/api/competitor-parser/load-competitor-product'
-# !!! ИЗМЕНЕНИЕ: ID удален отсюда, теперь он передается как аргумент при запуске
-# SHEBEKE_ID_UMICO = 198006659
+# ID удален отсюда, теперь он передается как аргумент при запуске
 API_KEY = '3e8d9b42c12a4e849b473fdc68c0cba70fe35338e4b01e6ed1fc2d3225cf07aa'
 
 TEST_MODE_ROW_LIMIT = 1000000
@@ -53,8 +54,39 @@ def send_product_data(row, shebeke_id):
         photo_full_path = os.path.join(PHOTOS_DIR, photo_filename_base)
 
         if os.path.exists(photo_full_path):
-            photo_to_close = open(photo_full_path, 'rb')
-            files = {'photo': (photo_filename_base, photo_to_close, 'image/jpeg')}
+            # --- НАЧАЛО ВСТАВЛЕННОЙ ЛОГИКИ КОНВЕРТАЦИИ ---
+            if photo_filename_base.lower().endswith('.png'):
+                print(f"Инфо: Конвертация '{photo_filename_base}' из PNG в JPG с белым фоном...")
+                try:
+                    # Открываем PNG изображение
+                    img = Image.open(photo_full_path).convert("RGBA")
+
+                    # Создаем новое изображение с белым фоном
+                    background = Image.new("RGB", img.size, (255, 255, 255))
+                    
+                    # Вставляем исходное изображение на белый фон, используя альфа-канал как маску
+                    background.paste(img, mask=img)
+
+                    # Создаем объект BytesIO для хранения JPG данных в памяти
+                    photo_to_close = io.BytesIO()
+
+                    # Сохраняем итоговое изображение как JPEG
+                    background.save(photo_to_close, format='JPEG', quality=85)
+
+                    # Перемещаем "курсор" в начало потока
+                    photo_to_close.seek(0)
+                    # Меняем расширение файла для API
+                    jpg_filename = os.path.splitext(photo_filename_base)[0] + '.jpg'
+                    files = {'photo': (jpg_filename, photo_to_close, 'image/jpeg')}
+                except Exception as e:
+                    print(f"Ошибка конвертации {photo_filename_base}: {e}")
+                    files = None
+                    photo_to_close = None 
+            else:
+                # Если это не PNG, используем старую логику
+                photo_to_close = open(photo_full_path, 'rb')
+                files = {'photo': (photo_filename_base, photo_to_close, 'image/jpeg')}
+            # --- КОНЕЦ ВСТАВЛЕННОЙ ЛОГИКИ ---
         else:
             print(f"Внимание: Файл фото не найден: {photo_full_path}. Отправка без фото.")
     else:
@@ -89,11 +121,11 @@ def main():
         print("Ошибка: API_KEY не установлен или используется ключ-плейсхолдер в sender.py. Пожалуйста, установите его.")
         return
 
-    # !!! ИЗМЕНЕНИЕ: Получаем ID из аргументов командной строки
+    # Получаем ID из аргументов командной строки
     try:
         if len(sys.argv) < 2:
             print("Ошибка: Необходим ID Shebeke в качестве аргумента командной строки.")
-            print("Пример: python sender.py 198006659")
+            print("Пример: python sender.py 123456789")
             return
         shebeke_id_to_use = int(sys.argv[1])
     except (ValueError, IndexError):
@@ -118,13 +150,13 @@ def main():
     else:
         df_to_send = df
 
-    # !!! ИЗМЕНЕНИЕ: Используем переменную shebeke_id_to_use, полученную из аргументов
+    # Используем переменную shebeke_id_to_use, полученную из аргументов
     print(f"Инфо: Начинаем отправку {len(df_to_send)} товаров (Shebeke ID: {shebeke_id_to_use})...")
     success_count = 0
     fail_count = 0
 
     for index, row in df_to_send.iterrows():
-        # !!! ИЗМЕНЕНИЕ: Передаем ID в функцию отправки
+        # Передаем ID в функцию отправки
         if send_product_data(row, shebeke_id_to_use):
             success_count += 1
         else:

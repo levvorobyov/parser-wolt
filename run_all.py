@@ -24,8 +24,8 @@ LOG_FILE = "run_interactive_araz.log"
 SHEBEKE_ID_UMICO = 198006659
 
 # --- ПЕРЕКЛЮЧАТЕЛИ ---
-USE_VPN = True    # Измените на False, чтобы отключить VPN
-USE_PROXY = False  # Измените на True, чтобы включить Прокси
+USE_VPN = False    # Измените на False, чтобы отключить VPN
+USE_PROXY = True  # Измените на True, чтобы включить Прокси
 
 # --- СПИСОК ССЫЛОК ДЛЯ ПАРСИНГА ---
 LINKS_TO_PARSE = {
