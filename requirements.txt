@@ -1,0 +1,8 @@
+pandas
+requests
+beautifulsoup4
+psutil
+selenium-wire
+packaging
+blinker==1.4
+setuptools
