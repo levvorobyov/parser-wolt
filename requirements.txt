@@ -6,3 +6,4 @@ selenium-wire
 packaging
 blinker==1.4
 setuptools
+Pillow
