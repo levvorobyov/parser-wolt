@@ -266,7 +266,7 @@ def main():
             logging.warning("\nПарсинг не был успешным. Отправка данных отменена.")
 
         if i < total_selected:
-            delay_seconds = random.randint(60, 300)
+            delay_seconds = random.randint(60, 200)
             minutes = delay_seconds // 60
             seconds = delay_seconds % 60
             logging.info(f"\n{'='*25} ПАУЗА {'='*25}")
