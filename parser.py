@@ -7,12 +7,17 @@ from bs4 import BeautifulSoup
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
+from selenium.common.exceptions import WebDriverException
 
 # Импортируем наши собственные модули
 import config
 from utils import cleanup_previous_run, save_debug_info, handle_all_popups, human_mouse_move, random_wait
 from webdriver_factory import create_driver
 from data_processor import download_images, write_to_csv, get_proxies_for_requests
+
+# !!! НОВОЕ: Настройки для повторной проверки IP
+IP_CHECK_RETRIES = 6
+IP_CHECK_DELAY_SECONDS = 20
 
 def main():
     """Основная логика парсера."""
@@ -34,10 +39,31 @@ def main():
         # 2. Создание браузера
         driver = create_driver(use_proxy_flag=use_proxy_flag)
         
-        # Проверка IP, если нужно
-        driver.get('https://httpbin.org/ip')
-        WebDriverWait(driver, 15).until(EC.presence_of_element_located((By.TAG_NAME, 'pre')))
-        print(f"УСПЕХ! Браузер работает. IP АДРЕС: {driver.find_element(By.TAG_NAME, 'pre').text.strip()}")
+        # !!! ИЗМЕНЕНИЕ: Добавлена логика повторных попыток для проверки IP
+        ip_check_successful = False
+        for attempt in range(1, IP_CHECK_RETRIES + 1):
+            try:
+                print(f"--- Попытка {attempt}/{IP_CHECK_RETRIES} проверки IP-адреса... ---")
+                driver.get('https://httpbin.org/ip')
+                # Ждем появления тега <pre>, в котором содержится IP
+                wait = WebDriverWait(driver, 25)
+                ip_element = wait.until(EC.presence_of_element_located((By.TAG_NAME, 'pre')))
+                print(f"УСПЕХ! Браузер работает. IP АДРЕС: {ip_element.text.strip()}")
+                ip_check_successful = True
+                break # Если успешно, выходим из цикла
+            except WebDriverException as e:
+                print(f"ОШИБКА при проверке IP (попытка {attempt}): {str(e).splitlines()[0]}")
+                save_debug_info(driver, f"ip_check_fail_attempt_{attempt}")
+                if attempt < IP_CHECK_RETRIES:
+                    print(f"Пауза {IP_CHECK_DELAY_SECONDS} секунд перед повторной попыткой...")
+                    time.sleep(IP_CHECK_DELAY_SECONDS)
+                else:
+                    print("!!! КРИТИЧЕСКАЯ ОШИБКА: Не удалось проверить IP-адрес после всех попыток.")
+        
+        # Если после всех попыток IP так и не проверился, завершаем скрипт с ошибкой
+        if not ip_check_successful:
+            raise RuntimeError("Не удалось подтвердить рабочий IP-адрес.")
+
 
         # 3. Основной цикл парсинга
         print(f"\nЗагружаем страницу: {start_url}")
@@ -56,7 +82,6 @@ def main():
             handle_all_popups(driver)
             count_before_scroll = len(processed_urls)
             
-            # Логика сбора данных со страницы...
             cards = driver.find_elements(By.CSS_SELECTOR, "div[data-test-id='ItemCard']")
             for card in cards:
                 try:
@@ -83,7 +108,6 @@ def main():
                     print(f"Предупреждение: Пропущена карточка из-за ошибки: {e}")
                     continue
 
-            # Логика прокрутки
             print("...плавная прокрутка страницы...")
             current_height = driver.execute_script("return document.body.scrollHeight")
             while True:
@@ -119,6 +143,8 @@ def main():
         print(f"КРИТИЧЕСКАЯ ОШИБКА в основном блоке: {e}")
         if driver:
             save_debug_info(driver, "critical_error")
+        # !!! ИЗМЕНЕНИЕ: Явный выход с кодом ошибки, чтобы run_all.py мог это отследить
+        sys.exit(1)
     finally:
         if driver:
             driver.quit()

@@ -20,12 +20,14 @@ except ImportError:
 # --- КОНФИГУРАЦИЯ ---
 LOCK_FILE = "run_all_araz.lock"
 LOG_FILE = "run_interactive_araz.log"
-# !!! ИЗМЕНЕНИЕ: ID магазина перенесен сюда для централизованного управления
 SHEBEKE_ID_UMICO = 198006659
+# Настройки для повторного запуска при ошибках
+MAX_RETRIES_PER_CATEGORY = 10
+RETRY_DELAY_SECONDS = 20
 
 # --- ПЕРЕКЛЮЧАТЕЛИ ---
-USE_VPN = False    # Измените на False, чтобы отключить VPN
-USE_PROXY = True  # Измените на True, чтобы включить Прокси
+USE_VPN = False
+USE_PROXY = True
 
 # --- СПИСОК ССЫЛОК ДЛЯ ПАРСИНГА ---
 LINKS_TO_PARSE = {
@@ -134,7 +136,6 @@ def display_menu(menu_title, options):
     """Отображает универсальное меню."""
     print("\n" + "="*60)
     print(menu_title)
-    # ДОБАВЛЕНО: Опция "Парсить всё"
     print("  0: Парсить все категории (Parse All Categories)")
     for key, text in options.items():
         print(f"  {key}: {text}")
@@ -148,7 +149,6 @@ def get_link_selection():
         if user_input.lower() == 'exit':
             return []
 
-        # ДОБАВЛЕНО: Проверка на ввод "0"
         if user_input == '0':
             print("Выбраны все категории для парсинга.")
             return list(LINKS_TO_PARSE.values())
@@ -170,16 +170,16 @@ def get_link_selection():
         if valid_selection:
             return selected_links
 
-# !!! ИЗМЕНЕНИЕ: Добавлен новый аргумент `shebeke_id` для передачи в sender.py
 def run_script(script_name, url=None, use_proxy_flag=False, shebeke_id=None):
-    """Запускает скрипт в реальном времени, без буферизации."""
+    """
+    Запускает скрипт и выводит его лог в реальном времени.
+    """
     script_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), script_name)
     command = [sys.executable, "-u", script_path]
     if url:
         command.append(url)
     if use_proxy_flag:
         command.append("--use-proxy")
-    # !!! ИЗМЕНЕНИЕ: Если shebeke_id предоставлен, добавляем его в команду
     if shebeke_id:
         command.append(str(shebeke_id))
 
@@ -187,27 +187,39 @@ def run_script(script_name, url=None, use_proxy_flag=False, shebeke_id=None):
         logging.error(f"!!! Ошибка: Скрипт '{script_name}' не найден по пути '{script_path}'")
         return False
 
-    logging.info(f"\n{'='*25} ЗАПУСК СКРИПТА: {script_name} {'='*25}\n")
+    logging.info(f"\n{'='*25} ЗАПУСК СКРИПТА: {script_name} {' '.join(command[2:])} {'='*25}\n")
+
     try:
-        with subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, encoding='utf-8', bufsize=1) as p:
-            for line in p.stdout:
-                logging.info(line.strip())
+        # Используем Popen для немедленного получения вывода
+        process = subprocess.Popen(
+            command,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,  # Объединяем stdout и stderr
+            text=True,
+            encoding='utf-8',
+            bufsize=1  # Построчная буферизация
+        )
 
-        if p.returncode != 0:
-             raise subprocess.CalledProcessError(p.returncode, p.args)
+        # Читаем и логируем вывод в реальном времени
+        for line in process.stdout:
+            logging.info(line.strip())
 
+        process.wait()  # Ждем завершения процесса
+
+        # Проверяем код возврата после завершения
+        if process.returncode != 0:
+            logging.error(f"\n!!! КРИТИЧЕСКАЯ ОШИБКА: Скрипт '{script_name}' завершился с кодом возврата {process.returncode}.")
+            return False
+        
         logging.info(f"\n{'='*25} СКРИПТ '{script_name}' УСПЕШНО ЗАВЕРШЕН {'='*25}\n")
         return True
-    except subprocess.CalledProcessError:
-        logging.error(f"\n!!! КРИТИЧЕСКАЯ ОШИБКА: Скрипт '{script_name}' завершился с ошибкой.")
-        return False
+
     except Exception as e:
         logging.error(f"!!! Непредвиденная ошибка при запуске '{script_name}': {e}")
         return False
 
 def main():
     """Основная функция: меню и последовательный запуск парсера и сендера."""
-
     display_menu("Выберите категории для парсинга:", {k: v[0] for k, v in LINKS_TO_PARSE.items()})
     selected_links = get_link_selection()
 
@@ -235,35 +247,48 @@ def main():
 
         parser_successful = False
 
-        if USE_VPN:
-            vpn_process = None
-            start_cmd_string = f'echo {sudo_password} | sudo -S openvpn --config {vpn_config_file}'
-            stop_cmd_string = f'echo {sudo_password} | sudo -S pkill openvpn'
-            try:
-                logging.info(f"Запускаем VPN...")
-                vpn_process = subprocess.Popen(start_cmd_string, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-                time.sleep(10)
-                if vpn_process.poll() is not None:
-                    raise RuntimeError("Не удалось запустить VPN.")
-                logging.info("VPN соединение активно. Начинаем парсинг...")
+        # Цикл повторных попыток для каждой категории
+        for attempt in range(1, MAX_RETRIES_PER_CATEGORY + 1):
+            logging.info(f"--- Попытка парсинга {attempt}/{MAX_RETRIES_PER_CATEGORY} для категории '{link_name}' ---")
 
+            if USE_VPN:
+                vpn_process = None
+                start_cmd_string = f'echo {sudo_password} | sudo -S openvpn --config {vpn_config_file}'
+                stop_cmd_string = f'echo {sudo_password} | sudo -S pkill openvpn'
+                try:
+                    logging.info("Запускаем VPN...")
+                    vpn_process = subprocess.Popen(start_cmd_string, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+                    time.sleep(10)
+                    if vpn_process.poll() is not None:
+                        raise RuntimeError("Не удалось запустить VPN.")
+                    logging.info("VPN соединение активно. Начинаем парсинг...")
+                    parser_successful = run_script('parser.py', url=link_url, use_proxy_flag=USE_PROXY)
+                except Exception as e:
+                    logging.error(f"\n!!! Произошла ошибка во время сессии VPN: {e}")
+                    parser_successful = False
+                finally:
+                    if vpn_process:
+                        logging.info("\nОтключаем VPN...")
+                        subprocess.run(stop_cmd_string, shell=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                        logging.info("VPN процесс был остановлен.")
+            else: # Запуск без VPN
                 parser_successful = run_script('parser.py', url=link_url, use_proxy_flag=USE_PROXY)
-            except Exception as e:
-                logging.error(f"\n!!! Произошла ошибка во время сессии VPN: {e}")
-            finally:
-                if vpn_process:
-                    logging.info("\nОтключаем VPN...")
-                    subprocess.run(stop_cmd_string, shell=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-                    logging.info("VPN процесс был остановлен.")
-        else: # Запуск без VPN
-            parser_successful = run_script('parser.py', url=link_url, use_proxy_flag=USE_PROXY)
 
+            # Если парсинг прошел успешно, выходим из цикла попыток
+            if parser_successful:
+                break
+            
+            logging.warning(f"Попытка {attempt} не удалась.")
+            if attempt < MAX_RETRIES_PER_CATEGORY:
+                logging.info(f"Пауза {RETRY_DELAY_SECONDS} секунд перед повторным запуском (с новым IP)...")
+                time.sleep(RETRY_DELAY_SECONDS)
+        
+        # Проверяем итоговый результат после всех попыток
         if parser_successful:
-            logging.info("\nЗапускаем отправку данных...")
-            # !!! ИЗМЕНЕНИЕ: Передаем SHEBEKE_ID_UMICO в скрипт sender.py
+            logging.info(f"\nКатегория '{link_name}' успешно спарсена. Запускаем отправку данных...")
             run_script('sender.py', shebeke_id=SHEBEKE_ID_UMICO)
         else:
-            logging.warning("\nПарсинг не был успешным. Отправка данных отменена.")
+            logging.error(f"\n!!! НЕ УДАЛОСЬ спарсить категорию '{link_name}' после {MAX_RETRIES_PER_CATEGORY} попыток. Отправка данных отменена.")
 
         if i < total_selected:
             delay_seconds = random.randint(60, 200)
