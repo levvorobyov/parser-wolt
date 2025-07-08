@@ -30,7 +30,7 @@ USE_PROXY = True  # Измените на True, чтобы включить Пр
 # --- СПИСОК ССЫЛОК ДЛЯ ПАРСИНГА ---
 LINKS_TO_PARSE = {
     '1':  ("Meyvə & Tərəvəz",                "https://wolt.com/az/aze/baku/venue/araz-supermarket-nefilr/items/yumurta-39"), #https://wolt.com/az/aze/baku/venue/araz-supermarket-nefilr/items/meyv-trvz-17
-    '2':  ("Xonça Un Məmulatları",           "https://wolt.com/az/aze/baku/venue/araz-supermarket-nefilr/items/xonca-un-mmulatlar-32"),
+    '2':  ("Xonça Un Məmulatları",           "https://wolt.com/az/aze/baku/venue/araz-supermarket-nefilr/items/yumurta-39"), #https://wolt.com/az/aze/baku/venue/araz-supermarket-nefilr/items/xonca-un-mmulatlar-32
     '3':  ("Təzə ət məhsulları",             "https://wolt.com/az/aze/baku/venue/araz-supermarket-nefilr/items/tz-t-mhsullar-38"),
     '4':  ("Toyuq məhsulları",               "https://wolt.com/az/aze/baku/venue/araz-supermarket-nefilr/items/toyuq-mhsullar-37"),
     '5':  ("Dəniz məhsulları",               "https://wolt.com/az/aze/baku/venue/araz-supermarket-nefilr/items/dniz-mhsullar-47"),
