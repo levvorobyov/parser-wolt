@@ -18,5 +18,5 @@ USER_AGENTS = [
 # Данные прокси (если используются)
 PROXY_HOST = "brd.superproxy.io"
 PROXY_PORT = 33335
-PROXY_USER = "brd-customer-hl_335cad1c-zone-datacenter_proxy1"
-PROXY_PASS = "fcxp876yscbo"
+PROXY_USER = "brd-customer-hl_335cad1c-zone-datacenter_proxy_araz"
+PROXY_PASS = "9xabfgb7aidn"
